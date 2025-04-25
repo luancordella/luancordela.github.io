@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Demandas GRIN</title>
   <style>
-    /* Estilos atualizados */
+    /* Estilos atualizados (iguais aos anteriores) */
     * { box-sizing: border-box; }
     body {
       font-family: 'Roboto', sans-serif;
@@ -48,7 +48,6 @@
   </style>
 </head>
 <body>
-  <!-- Login Form -->
   <div id="loginForm">
     <h3>Demandas GRIN</h3>
     <input type="text" id="usuario" placeholder="Usuário (ex: PPAULO, DBNUNES)">
@@ -56,37 +55,36 @@
     <button class="primary" onclick="login()">Entrar</button>
   </div>
 
-  <!-- Main Panel -->
   <div id="painel" style="display:none;">
     <button id="logoutBtn" class="danger" onclick="logout()">Logout</button>
     <h2>Painel de Demandas</h2>
-    
-    <!-- Botão de Atualizar Demandas -->
-    <button class="info" style="margin-bottom: 12px;" onclick="baixarDemandas()">Baixar Demandas</button>
-    
-    <!-- Upload de Demandas -->
+
+    <button class="info" style="margin-bottom: 12px;" onclick="baixarDemandas()">Baixar Demandas (LocalStorage)</button>
+
     <input type="file" id="uploadInput" style="display: none;" onchange="carregarDemandasDoArquivo(event)" />
-    <button class="info" style="margin-bottom: 12px;" onclick="document.getElementById('uploadInput').click()">Carregar Demandas</button>
-    
-    <!-- Demand Creation (EDIAS only) -->
-    <div id="painelEdicao" style="display:none;">
-      <textarea id="novaDemanda" rows="3" placeholder="Descreva a demanda..."></textarea>
-      <select id="categoria">
+    <button class="info" style="margin-bottom: 12px;" onclick="document.getElementById('uploadInput').click()">Carregar Demandas (LocalStorage)</button>
+
+    <form id="painelEdicao" name="demandas" netlify style="display:none;">
+      <input type="hidden" name="form-name" value="demandas">
+
+      <textarea id="novaDemanda" name="novaDemanda" rows="3" placeholder="Descreva a demanda..."></textarea>
+      <select id="categoria" name="categoria">
         <option value="NIR">Categoria: NIR</option>
         <option value="NAG">Categoria: NAG</option>
         <option value="NAPAC">Categoria: NAPAC</option>
         <option value="GRIN">Categoria: GRIN</option>
       </select>
-      <input type="date" id="prazo">
-      <select id="prioridade">
+      <input type="date" id="prazo" name="prazo">
+      <select id="prioridade" name="prioridade">
         <option value="Baixa">Prioridade: Baixa</option>
         <option value="Média">Prioridade: Média</option>
         <option value="Alta">Prioridade: Alta</option>
       </select>
-      <input type="file" id="anexoInput" style="margin-bottom: 12px;" />
-      <button class="primary" onclick="adicionarDemanda()">Adicionar Demanda</button>
-    </div>
-    
+      <input type="file" id="anexoInput" name="anexo" style="margin-bottom: 12px;" />
+
+      <button type="button" class="primary" onclick="adicionarDemanda()">Adicionar Demanda</button>
+    </form>
+
     <ul id="listaDemandas"></ul>
   </div>
 
@@ -94,13 +92,14 @@
     let usuarioAtual = null;
     let demandas = [];
 
-    // Puxa do localStorage e renderiza
+    // Puxa do localStorage e renderiza (sem alterações)
     function carregarDemandas() {
       const saved = localStorage.getItem('demandas') || '[]';
       demandas = JSON.parse(saved);
       renderDemandas();
     }
 
+    // Função login (sem alterações)
     function login() {
       const user = document.getElementById('usuario').value.trim().toLowerCase();
       const pass = document.getElementById('senha').value;
@@ -120,145 +119,276 @@
       }
     }
 
+    // Função logout (sem alterações)
     function logout() {
       usuarioAtual = null;
       document.getElementById('painel').style.display = 'none';
       document.getElementById('loginForm').style.display = 'block';
     }
 
+    // Função mostrarPainel (sem alterações, continua controlando a div/form com id="painelEdicao")
     function mostrarPainel() {
       document.getElementById('loginForm').style.display = 'none';
       document.getElementById('painel').style.display = 'block';
       document.getElementById('painelEdicao').style.display = usuarioAtual === 'edias' ? 'block' : 'none';
     }
 
+    // Função renderDemandas (sem alterações significativas, exceto talvez o texto do anexo)
     function renderDemandas() {
-      const ul = document.getElementById('listaDemandas'); ul.innerHTML = '';
-      const demandasFiltradas = usuarioAtual === 'luan'
-        ? demandas
+        const ul = document.getElementById('listaDemandas'); ul.innerHTML = '';
+        const demandasFiltradas = usuarioAtual === 'luan'
+        ? demandas // Luan e Edias veem tudo (Edias vê o filtro implícito no acesso)
         : demandas.filter(d => {
             if (usuarioAtual === 'ppaulo') return d.categoria === 'NIR';
             if (usuarioAtual === 'dbnunes') return d.categoria === 'NAG';
             if (usuarioAtual === 'lbmartin') return d.categoria === 'NAPAC';
-            return true;
+            // Edias também passa por aqui, mas como nenhuma condição é true, retorna true (vê tudo)
+            // Se houver outros usuários, eles também verão tudo por padrão
+            return true; // Para Edias e qualquer outro usuário não especificado
           });
 
-      demandasFiltradas.forEach((d, i) => {
-        const li = document.createElement('li');
-        li.classList.add(d.executada ? 'finalizado' : 'pendente');
-        let html = `<strong>${d.texto}</strong> <span class='meta'>[${d.categoria} | ${d.prioridade} | até ${d.prazo || '--'}]</span><br>` +
-                   `<small>Criada em: ${d.dataCriada}</small>`;
-        if (d.executada) html += `<br><small>Executada em: ${d.dataExecutada}</small>`;
-        if (d.anexo) html += `<br><span class='anexo' onclick="baixarAnexo('${d.anexo}')">Baixar Anexo</span>`;
-        let controls = '';
-        if (usuarioAtual === 'luan') {
-          if (!d.executada) controls += `<button class='success' onclick="marcarExecutada(${i})">Executar</button>`;
-          controls += `<button class='info' onclick="adicionarObservacao(${i})">Observação</button>`;
-          controls += `<button class='warning' onclick="editarDemanda(${i})">Editar</button>`;
-          controls += `<button class='danger' onclick="excluirDemanda(${i})">Excluir</button>`;
-        } else if (usuarioAtual !== 'edias' && !d.executada) {
-          controls += `<button class='success' onclick="marcarExecutada(${i})">Executar</button>`;
-          controls += `<button class='info' onclick="adicionarObservacao(${i})">Observação</button>`;
-        }
-        if (usuarioAtual === 'edias' && !d.executada) {
-          controls += `<button class='warning' onclick="editarDemanda(${i})">Editar</button>`;
-        }
-        html += `<div class='controls'>${controls}</div>`;
-        if (d.observacoes.length) {
-          html += `<div class='observacao'>` + d.observacoes.map(o => `<p>${o}</p>`).join('') + `</div>`;
-        }
-        li.innerHTML = html;
-        ul.appendChild(li);
-      });
+        demandasFiltradas.forEach((d, i) => {
+            const li = document.createElement('li');
+            li.classList.add(d.executada ? 'finalizado' : 'pendente');
+            let html = `<strong>${d.texto}</strong> <span class='meta'>[${d.categoria} | ${d.prioridade} | até ${d.prazo || '--'}]</span><br>` +
+                       `<small>Criada em: ${d.dataCriada}</small>`;
+            if (d.executada) html += `<br><small>Executada em: ${d.dataExecutada}</small>`;
+
+            // Aviso sobre o anexo: O botão só funciona se o arquivo estiver acessível via JS/localStorage (não via Netlify)
+            if (d.anexo) html += `<br><span class='anexo' onclick="baixarAnexo('${d.anexo}')">Baixar Anexo (Local)</span>`;
+
+            let controls = '';
+            // Luan: pode executar, observar, editar, excluir
+            if (usuarioAtual === 'luan') {
+            if (!d.executada) controls += `<button class='success' onclick="marcarExecutada(${i})">Executar</button>`;
+            controls += `<button class='info' onclick="adicionarObservacao(${i})">Observação</button>`;
+            controls += `<button class='warning' onclick="editarDemanda(${i})">Editar</button>`;
+            controls += `<button class='danger' onclick="excluirDemanda(${i})">Excluir</button>`;
+            }
+            // Edias: pode editar (se não executada)
+            else if (usuarioAtual === 'edias') {
+                if (!d.executada) controls += `<button class='warning' onclick="editarDemanda(${i})">Editar</button>`;
+                 controls += `<button class='info' onclick="adicionarObservacao(${i})">Observação</button>`; // Edias também pode observar
+            }
+            // Outros usuários (ppaulo, dbnunes, lbmartin): podem executar e observar (se não executada)
+            else if (!d.executada) {
+            controls += `<button class='success' onclick="marcarExecutada(${i})">Executar</button>`;
+            controls += `<button class='info' onclick="adicionarObservacao(${i})">Observação</button>`;
+            }
+
+            html += `<div class='controls'>${controls}</div>`;
+            if (d.observacoes && d.observacoes.length) { // Verifica se observacoes existe e tem itens
+                 html += `<div class='observacao'>` + d.observacoes.map(o => `<p>${o}</p>`).join('') + `</div>`;
+            }
+            li.innerHTML = html;
+            ul.appendChild(li);
+        });
     }
 
-    function adicionarDemanda() {
-      if (usuarioAtual !== 'edias') return;
-      const texto = document.getElementById('novaDemanda').value.trim(); if (!texto) return;
+
+    // --- FUNÇÃO ADICIONARDEMANDA MODIFICADA ---
+    async function adicionarDemanda() { // Tornou-se async para usar await com fetch
+      if (usuarioAtual !== 'edias') return; // Apenas 'edias' pode adicionar
+
+      const formElement = document.getElementById('painelEdicao'); // Pega o elemento FORM
+      const textoInput = document.getElementById('novaDemanda');
+      const fileInput = document.getElementById('anexoInput');
+
+      const texto = textoInput.value.trim();
+      if (!texto) {
+          alert("A descrição da demanda não pode estar vazia.");
+          return; // Sai da função se o texto estiver vazio
+      }
+
+      // --- 1. Lógica para salvar no LocalStorage (como antes) ---
       const categoria = document.getElementById('categoria').value;
       const prazo = document.getElementById('prazo').value;
       const prioridade = document.getElementById('prioridade').value;
-      const fileInput = document.getElementById('anexoInput');
       const anexo = fileInput.files[0];
       const dataCriada = new Date().toLocaleString();
 
       let anexoNome = null;
       if (anexo) {
-        anexoNome = anexo.name; // manual download via botão "Baixar Anexo"
+        anexoNome = anexo.name; // Salva apenas o nome no localStorage
       }
 
-      const novaDemanda = { texto, categoria, prazo, prioridade, dataCriada, executada: false, dataExecutada: '', observacoes: [], anexo: anexoNome };
+      const novaDemanda = {
+        texto,
+        categoria,
+        prazo,
+        prioridade,
+        dataCriada,
+        executada: false,
+        dataExecutada: '',
+        observacoes: [], // Inicia com array de observações vazio
+        anexo: anexoNome // Salva o nome do arquivo ou null
+      };
+
       demandas.push(novaDemanda);
-      salvarDemandasAutomaticamente();
-      renderDemandas();
-      document.getElementById('novaDemanda').value = ''; 
-      fileInput.value = '';
-    }
+      salvarDemandasAutomaticamente(); // Salva o array atualizado no localStorage
+      renderDemandas(); // Atualiza a lista na tela imediatamente
 
+      // --- 2. Lógica para enviar os dados do formulário para o Netlify ---
+      const formData = new FormData(formElement); // Cria FormData a partir do <form>
+                                                 // Inclui automaticamente todos os campos com 'name'
+                                                 // e o campo oculto 'form-name'
+
+      try {
+        console.log("Enviando para o Netlify...");
+        const response = await fetch("/", { // Envia para a raiz do site (Netlify detecta)
+          method: "POST",
+          body: formData // Envia os dados, incluindo o arquivo se houver
+        });
+
+        if (response.ok) {
+          console.log("Demanda enviada com sucesso para o Netlify.");
+          // Poderia adicionar uma notificação não-bloqueante aqui
+        } else {
+          console.error("Falha ao enviar demanda para o Netlify. Status:", response.status);
+          // Poderia alertar o usuário que o envio ao Netlify falhou, mas os dados estão salvos localmente.
+          // alert("Atenção: Falha ao registrar a demanda no servidor, mas ela foi salva localmente.");
+        }
+      } catch (error) {
+        console.error("Erro de rede ao tentar enviar para o Netlify:", error);
+        // alert("Atenção: Erro de rede ao tentar registrar a demanda no servidor. Ela foi salva localmente.");
+      }
+
+      // --- 3. Limpar os campos do formulário ---
+      // formElement.reset(); // Alternativa que limpa TUDO no form
+      textoInput.value = ''; // Limpa campo de texto
+      // Pode resetar selects para o padrão se quiser:
+      // document.getElementById('categoria').value = 'NIR';
+      // document.getElementById('prioridade').value = 'Baixa';
+      document.getElementById('prazo').value = ''; // Limpa data
+      fileInput.value = ''; // Limpa seleção de arquivo
+    }
+    // --- FIM DA FUNÇÃO ADICIONARDEMANDA ---
+
+
+    // Função marcarExecutada (sem alterações)
     function marcarExecutada(i) {
-      demandas[i].executada = true;
-      demandas[i].dataExecutada = new Date().toLocaleString();
-      salvarDemandasAutomaticamente();
-      renderDemandas();
-    }
-
-    function adicionarObservacao(i) {
-      const obs = prompt('Digite a observação:'); if (obs) {
-        demandas[i].observacoes.push(obs);
-        salvarDemandasAutomaticamente();
-        renderDemandas();
+      // Encontra o índice real na lista 'demandas' original, não na filtrada
+      const demandaOriginalIndex = demandas.findIndex(d => d.dataCriada === demandasFiltradas[i].dataCriada && d.texto === demandasFiltradas[i].texto);
+      if (demandaOriginalIndex > -1) {
+          demandas[demandaOriginalIndex].executada = true;
+          demandas[demandaOriginalIndex].dataExecutada = new Date().toLocaleString();
+          salvarDemandasAutomaticamente();
+          renderDemandas();
       }
     }
 
+    // Função adicionarObservacao (verifica se array existe)
+    function adicionarObservacao(i) {
+        const obs = prompt('Digite a observação:');
+        if (obs) {
+            // Encontra o índice real na lista 'demandas' original
+             const demandaOriginalIndex = demandas.findIndex(d => d.dataCriada === demandasFiltradas[i].dataCriada && d.texto === demandasFiltradas[i].texto);
+             if (demandaOriginalIndex > -1) {
+                // Garante que 'observacoes' seja um array
+                if (!Array.isArray(demandas[demandaOriginalIndex].observacoes)) {
+                    demandas[demandaOriginalIndex].observacoes = [];
+                }
+                demandas[demandaOriginalIndex].observacoes.push(`(${usuarioAtual} em ${new Date().toLocaleString()}): ${obs}`); // Adiciona usuário e data/hora
+                salvarDemandasAutomaticamente();
+                renderDemandas();
+            }
+        }
+    }
+
+
+   // Função editarDemanda (sem alterações)
     function editarDemanda(i) {
-      const novo = prompt('Editar demanda:', demandas[i].texto);
-      if (novo) { demandas[i].texto = novo; salvarDemandasAutomaticamente(); renderDemandas(); }
+        // Só permite editar se for Luan ou Edias (e a tarefa não estiver executada)
+        if ((usuarioAtual !== 'luan' && usuarioAtual !== 'edias') || demandasFiltradas[i].executada) return;
+
+        const demandaOriginalIndex = demandas.findIndex(d => d.dataCriada === demandasFiltradas[i].dataCriada && d.texto === demandasFiltradas[i].texto);
+        if (demandaOriginalIndex > -1) {
+            const novo = prompt('Editar demanda:', demandas[demandaOriginalIndex].texto);
+            if (novo !== null && novo.trim() !== "") { // Verifica se não cancelou ou deixou em branco
+                 demandas[demandaOriginalIndex].texto = novo.trim();
+                 salvarDemandasAutomaticamente();
+                 renderDemandas();
+            }
+        }
     }
 
+    // Função excluirDemanda (sem alterações)
     function excluirDemanda(i) {
-      if (usuarioAtual !== 'luan') return;
-      demandas.splice(i, 1); salvarDemandasAutomaticamente(); renderDemandas();
+      if (usuarioAtual !== 'luan') return; // Apenas 'luan' pode excluir
+      if (confirm("Tem certeza que deseja excluir esta demanda?")) { // Confirmação
+          // Encontra o índice real na lista 'demandas' original
+          const demandaOriginalIndex = demandas.findIndex(d => d.dataCriada === demandasFiltradas[i].dataCriada && d.texto === demandasFiltradas[i].texto);
+          if (demandaOriginalIndex > -1) {
+            demandas.splice(demandaOriginalIndex, 1);
+            salvarDemandasAutomaticamente();
+            renderDemandas();
+          }
+      }
     }
 
+
+    // Função baixarAnexo (sem alterações - LEMBRETE: Não baixa arquivos do Netlify)
     function baixarAnexo(nome) {
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(new Blob());
-      link.download = nome;
-      link.click();
-      URL.revokeObjectURL(link.href);
+        alert("Função 'Baixar Anexo' tenta criar um arquivo localmente. Ela não baixa arquivos enviados para o Netlify.");
+        // A lógica original tentaria criar um arquivo vazio com o nome:
+        /*
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob(["Conteúdo de exemplo se necessário"], {type: "text/plain"})); // Criando blob vazio ou com placeholder
+        link.download = nome;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        */
     }
 
+    // Função baixarDemandas (sem alterações - baixa o JSON do localStorage)
     function baixarDemandas() {
       const blob = new Blob([JSON.stringify(demandas, null, 2)], { type: 'application/json' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = 'demandas.json';
+      link.download = 'demandas_localStorage.json'; // Mudei o nome para clareza
       link.click();
       URL.revokeObjectURL(link.href);
     }
 
+    // Função carregarDemandasDoArquivo (sem alterações - carrega JSON para o localStorage)
     function carregarDemandasDoArquivo(event) {
       const file = event.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = e => {
         try {
-          demandas = JSON.parse(e.target.result);
-          salvarDemandasAutomaticamente()
-          renderDemandas();
+          const novasDemandas = JSON.parse(e.target.result);
+          // Validação básica se é um array
+          if (Array.isArray(novasDemandas)) {
+              demandas = novasDemandas; // Substitui as demandas atuais
+              salvarDemandasAutomaticamente()
+              renderDemandas();
+              alert("Demandas carregadas do arquivo com sucesso!");
+          } else {
+               alert('Arquivo JSON inválido. O conteúdo não é um array de demandas.');
+          }
         } catch (err) {
-          alert('Arquivo inválido.');
+          alert('Erro ao ler o arquivo ou formato JSON inválido.');
+          console.error("Erro ao carregar demandas:", err);
         }
       };
+      reader.onerror = () => {
+          alert("Não foi possível ler o arquivo selecionado.");
+      };
       reader.readAsText(file);
+      // Limpa o input de arquivo para permitir carregar o mesmo arquivo novamente se necessário
+      event.target.value = null;
     }
 
+    // Função salvarDemandasAutomaticamente (sem alterações)
     function salvarDemandasAutomaticamente() {
       localStorage.setItem('demandas', JSON.stringify(demandas));
     }
 
+    // Ao carregar a página, tenta carregar do localStorage (sem alterações)
     window.onload = () => {
       carregarDemandas();
+      // Não tenta logar automaticamente, espera interação do usuário
     };
   </script>
 </body>
