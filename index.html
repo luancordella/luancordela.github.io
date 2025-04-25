@@ -1,102 +1,265 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Painel de Demandas</title>
-  <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-database.js"></script>
+  <title>Demandas GRIN</title>
   <style>
+    /* Estilos atualizados */
+    * { box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Roboto', sans-serif;
+      margin: 0; padding: 0;
+      background: #eef2f7;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+      position: relative;
     }
-    .demandas-list {
-      margin-top: 20px;
+    #loginForm, #painel {
+      width: 90%; max-width: 480px;
+      background: #fff; padding: 24px;
+      border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      animation: fadeIn 0.5s ease;
     }
-    .demandas-list div {
-      padding: 10px;
-      border: 1px solid #ddd;
-      margin-bottom: 10px;
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px);} to { opacity:1; transform: translateY(0);} }
+    h3, h2 { text-align: center; margin-bottom: 16px; }
+    input, textarea, select { width: 100%; margin-bottom: 12px; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+    button { display: inline-block; padding: 10px 16px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: background 0.2s; margin: 4px 4px 4px 0; }
+    .primary { background: #007bff; color: #fff; }
+    .primary:hover { background: #0056b3; }
+    .danger { background: #dc3545; color: #fff; }
+    .danger:hover { background: #a71d2a; }
+    .success { background: #28a745; color: #fff; }
+    .info { background: #17a2b8; color: #fff; }
+    .warning { background: #ffc107; color: #212529; }
+    #logoutBtn { float: right; margin-top: -40px; }
+    ul { padding: 0; }
+    li { list-style: none; margin-bottom: 12px; padding: 12px; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .pendente { background: #fff3cd; }
+    .finalizado { background: #d4edda; }
+    .meta { font-size: 12px; color: #555; margin-top: 4px; }
+    .observacao { font-style: italic; margin-top: 8px; color: #333; }
+    .anexo { color: #007bff; text-decoration: underline; cursor: pointer; }
+    .notificacao {
+      position: absolute; top: 10px; right: 10px;
+      background: #ff4d4d; color: #fff;
+      padding: 8px 12px; border-radius: 50%;
+      font-size: 14px; font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h1>Painel de Demandas</h1>
+  <!-- Login Form -->
+  <div id="loginForm">
+    <h3>Demandas GRIN</h3>
+    <input type="text" id="usuario" placeholder="Usuário (ex: PPAULO, DBNUNES)">
+    <input type="password" id="senha" placeholder="Senha">
+    <button class="primary" onclick="login()">Entrar</button>
+  </div>
 
-  <!-- Formulário para adicionar nova demanda -->
-  <form id="adicionarDemandaForm">
-    <input type="text" id="descricao" placeholder="Descrição da demanda" required />
-    <input type="text" id="usuario" placeholder="Usuário responsável" required />
-    <button type="submit">Adicionar Demanda</button>
-  </form>
-
-  <!-- Lista de demandas -->
-  <div class="demandas-list" id="demandasList">
-    <h2>Demandas:</h2>
-    <!-- As demandas serão listadas aqui -->
+  <!-- Main Panel -->
+  <div id="painel" style="display:none;">
+    <button id="logoutBtn" class="danger" onclick="logout()">Logout</button>
+    <h2>Painel de Demandas</h2>
+    
+    <!-- Botão de Atualizar Demandas -->
+    <button class="info" style="margin-bottom: 12px;" onclick="baixarDemandas()">Baixar Demandas</button>
+    
+    <!-- Upload de Demandas -->
+    <input type="file" id="uploadInput" style="display: none;" onchange="carregarDemandasDoArquivo(event)" />
+    <button class="info" style="margin-bottom: 12px;" onclick="document.getElementById('uploadInput').click()">Carregar Demandas</button>
+    
+    <!-- Demand Creation (EDIAS only) -->
+    <div id="painelEdicao" style="display:none;">
+      <textarea id="novaDemanda" rows="3" placeholder="Descreva a demanda..."></textarea>
+      <select id="categoria">
+        <option value="NIR">Categoria: NIR</option>
+        <option value="NAG">Categoria: NAG</option>
+        <option value="NAPAC">Categoria: NAPAC</option>
+        <option value="GRIN">Categoria: GRIN</option>
+      </select>
+      <input type="date" id="prazo">
+      <select id="prioridade">
+        <option value="Baixa">Prioridade: Baixa</option>
+        <option value="Média">Prioridade: Média</option>
+        <option value="Alta">Prioridade: Alta</option>
+      </select>
+      <input type="file" id="anexoInput" style="margin-bottom: 12px;" />
+      <button class="primary" onclick="adicionarDemanda()">Adicionar Demanda</button>
+    </div>
+    
+    <ul id="listaDemandas"></ul>
   </div>
 
   <script>
-    // Configuração do Firebase
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      databaseURL: "https://portal-grin-default-rtdb.firebaseio.com/",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
+    let usuarioAtual = null;
+    let demandas = [];
+
+    // Puxa do localStorage e renderiza
+    function carregarDemandas() {
+      const saved = localStorage.getItem('demandas') || '[]';
+      demandas = JSON.parse(saved);
+      renderDemandas();
+    }
+
+    function login() {
+      const user = document.getElementById('usuario').value.trim().toLowerCase();
+      const pass = document.getElementById('senha').value;
+      const usuarios = {
+        edias: '30102016',
+        luan: '931-cr4z',
+        ppaulo: '12128725',
+        dbnunes: 'dani1010',
+        lbmartin: 'napac'
+      };
+      if (usuarios[user] === pass) {
+        usuarioAtual = user;
+        carregarDemandas();
+        mostrarPainel();
+      } else {
+        alert('Credenciais inválidas.');
+      }
+    }
+
+    function logout() {
+      usuarioAtual = null;
+      document.getElementById('painel').style.display = 'none';
+      document.getElementById('loginForm').style.display = 'block';
+    }
+
+    function mostrarPainel() {
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('painel').style.display = 'block';
+      document.getElementById('painelEdicao').style.display = usuarioAtual === 'edias' ? 'block' : 'none';
+    }
+
+    function renderDemandas() {
+      const ul = document.getElementById('listaDemandas'); ul.innerHTML = '';
+      const demandasFiltradas = usuarioAtual === 'luan'
+        ? demandas
+        : demandas.filter(d => {
+            if (usuarioAtual === 'ppaulo') return d.categoria === 'NIR';
+            if (usuarioAtual === 'dbnunes') return d.categoria === 'NAG';
+            if (usuarioAtual === 'lbmartin') return d.categoria === 'NAPAC';
+            return true;
+          });
+
+      demandasFiltradas.forEach((d, i) => {
+        const li = document.createElement('li');
+        li.classList.add(d.executada ? 'finalizado' : 'pendente');
+        let html = `<strong>${d.texto}</strong> <span class='meta'>[${d.categoria} | ${d.prioridade} | até ${d.prazo || '--'}]</span><br>` +
+                   `<small>Criada em: ${d.dataCriada}</small>`;
+        if (d.executada) html += `<br><small>Executada em: ${d.dataExecutada}</small>`;
+        if (d.anexo) html += `<br><span class='anexo' onclick="baixarAnexo('${d.anexo}')">Baixar Anexo</span>`;
+        let controls = '';
+        if (usuarioAtual === 'luan') {
+          if (!d.executada) controls += `<button class='success' onclick="marcarExecutada(${i})">Executar</button>`;
+          controls += `<button class='info' onclick="adicionarObservacao(${i})">Observação</button>`;
+          controls += `<button class='warning' onclick="editarDemanda(${i})">Editar</button>`;
+          controls += `<button class='danger' onclick="excluirDemanda(${i})">Excluir</button>`;
+        } else if (usuarioAtual !== 'edias' && !d.executada) {
+          controls += `<button class='success' onclick="marcarExecutada(${i})">Executar</button>`;
+          controls += `<button class='info' onclick="adicionarObservacao(${i})">Observação</button>`;
+        }
+        if (usuarioAtual === 'edias' && !d.executada) {
+          controls += `<button class='warning' onclick="editarDemanda(${i})">Editar</button>`;
+        }
+        html += `<div class='controls'>${controls}</div>`;
+        if (d.observacoes.length) {
+          html += `<div class='observacao'>` + d.observacoes.map(o => `<p>${o}</p>`).join('') + `</div>`;
+        }
+        li.innerHTML = html;
+        ul.appendChild(li);
+      });
+    }
+
+    function adicionarDemanda() {
+      if (usuarioAtual !== 'edias') return;
+      const texto = document.getElementById('novaDemanda').value.trim(); if (!texto) return;
+      const categoria = document.getElementById('categoria').value;
+      const prazo = document.getElementById('prazo').value;
+      const prioridade = document.getElementById('prioridade').value;
+      const fileInput = document.getElementById('anexoInput');
+      const anexo = fileInput.files[0];
+      const dataCriada = new Date().toLocaleString();
+
+      let anexoNome = null;
+      if (anexo) {
+        anexoNome = anexo.name; // manual download via botão "Baixar Anexo"
+      }
+
+      const novaDemanda = { texto, categoria, prazo, prioridade, dataCriada, executada: false, dataExecutada: '', observacoes: [], anexo: anexoNome };
+      demandas.push(novaDemanda);
+      salvarDemandasAutomaticamente();
+      renderDemandas();
+      document.getElementById('novaDemanda').value = ''; 
+      fileInput.value = '';
+    }
+
+    function marcarExecutada(i) {
+      demandas[i].executada = true;
+      demandas[i].dataExecutada = new Date().toLocaleString();
+      salvarDemandasAutomaticamente();
+      renderDemandas();
+    }
+
+    function adicionarObservacao(i) {
+      const obs = prompt('Digite a observação:'); if (obs) {
+        demandas[i].observacoes.push(obs);
+        salvarDemandasAutomaticamente();
+        renderDemandas();
+      }
+    }
+
+    function editarDemanda(i) {
+      const novo = prompt('Editar demanda:', demandas[i].texto);
+      if (novo) { demandas[i].texto = novo; salvarDemandasAutomaticamente(); renderDemandas(); }
+    }
+
+    function excluirDemanda(i) {
+      if (usuarioAtual !== 'luan') return;
+      demandas.splice(i, 1); salvarDemandasAutomaticamente(); renderDemandas();
+    }
+
+    function baixarAnexo(nome) {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob());
+      link.download = nome;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function baixarDemandas() {
+      const blob = new Blob([JSON.stringify(demandas, null, 2)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'demandas.json';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function carregarDemandasDoArquivo(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          demandas = JSON.parse(e.target.result);
+          salvarDemandasAutomaticamente()
+          renderDemandas();
+        } catch (err) {
+          alert('Arquivo inválido.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function salvarDemandasAutomaticamente() {
+      localStorage.setItem('demandas', JSON.stringify(demandas));
+    }
+
+    window.onload = () => {
+      carregarDemandas();
     };
-
-    // Inicializa o Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const database = firebase.database(app);
-
-    // Referência para a lista de demandas no banco de dados
-    const demandasRef = database.ref('demandas');
-
-    // Função para adicionar nova demanda
-    function adicionarDemanda(descricao, usuario) {
-      const newDemandaRef = demandasRef.push();
-      newDemandaRef.set({
-        descricao: descricao,
-        usuario: usuario,
-        status: "pendente"
-      });
-    }
-
-    // Função para exibir as demandas no painel
-    function exibirDemandas() {
-      const demandasList = document.getElementById('demandasList');
-      demandasList.innerHTML = "<h2>Demandas:</h2>";  // Limpa a lista antes de adicionar
-
-      // Carregar as demandas em tempo real
-      demandasRef.on('child_added', (snapshot) => {
-        const demanda = snapshot.val();
-        const demandaDiv = document.createElement('div');
-        demandaDiv.innerHTML = `
-          <strong>${demanda.descricao}</strong> (Responsável: ${demanda.usuario}) - Status: ${demanda.status}
-        `;
-        demandasList.appendChild(demandaDiv);
-      });
-    }
-
-    // Submeter o formulário de adicionar demanda
-    document.getElementById('adicionarDemandaForm').addEventListener('submit', (event) => {
-      event.preventDefault();
-      const descricao = document.getElementById('descricao').value;
-      const usuario = document.getElementById('usuario').value;
-      
-      // Adiciona a nova demanda ao banco de dados
-      adicionarDemanda(descricao, usuario);
-
-      // Limpa os campos do formulário
-      document.getElementById('descricao').value = '';
-      document.getElementById('usuario').value = '';
-    });
-
-    // Exibir as demandas assim que a página for carregada
-    exibirDemandas();
   </script>
 </body>
 </html>
